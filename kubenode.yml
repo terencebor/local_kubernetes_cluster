@@ -1,0 +1,82 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Installing the required packages for Docker
+      yum:
+        name: [
+               'yum-utils',
+               'device-mapper-persistent-data',
+               'lvm2'
+              ]
+        state: present
+
+    - name: Setting up the stable Docker-ce repository
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+        remote_src: yes
+
+    - name: Adding EPEL repository
+      yum: name=epel-release state=present
+
+    - name: Installing Docker-ce
+      yum:
+        name: docker-ce-18.06.1.ce
+        state: present
+
+    - name: Ensure that Docker is enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Turning off a swap
+      command: swapoff -a
+
+    - name: Disabling a swap
+      lineinfile:
+        path: /etc/fstab
+        state: absent
+        regexp: '^.*swap.*$'
+
+    - name: Enabling a kubernetes rpm repository
+      copy:
+        src: kubernetes.repo
+        dest: /etc/yum.repos.d/kubernetes.repo
+
+    - name: Setting selinux in permissive mode.
+      selinux:
+        policy: targeted
+        state: permissive
+    - name: Change a selinux config file
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=permissive'
+
+    - name: Setting kernel settings for iptables
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Installing kubernetes with disable_excludes
+      yum:
+        name:
+         - kubelet
+         - kubeadm
+         - kubectl
+        state: present
+        disable_excludes: 'kubernetes'
+
+    - name: Starting and Enabling kubelet
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+
+    - name: Joining a cluster
+      become: yes
+      shell: $(cat /vagrant/join_node.txt)

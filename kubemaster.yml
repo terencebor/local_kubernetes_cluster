@@ -1,0 +1,108 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Installing the required packages for Docker
+      yum:
+        name: [
+               'yum-utils',
+               'device-mapper-persistent-data',
+               'lvm2'
+              ]
+        state: present
+
+    - name: Setting up the stable Docker-ce repository
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+        remote_src: yes
+
+    - name: Adding EPEL repository
+      yum: name=epel-release state=present
+
+    - name: Installing Docker-ce
+      yum:
+        name: docker-ce-18.06.1.ce
+        state: present
+
+    - name: Ensuring that Docker is enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Turning off a swap
+      command: swapoff -a
+
+    - name: Disabling a swap
+      lineinfile:
+        path: /etc/fstab
+        state: absent
+        regexp: '^.*swap.*$'
+
+    - name: Enabling a kubernetes rpm repository
+      copy:
+        src: kubernetes.repo
+        dest: /etc/yum.repos.d/kubernetes.repo
+
+    - name: Setting selinux in permissive mode.
+      selinux:
+        policy: targeted
+        state: permissive
+    - name: Changing a selinux config file
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=permissive'
+
+    - name: Installing kubernetes with disable_excludes
+      yum:
+        name:
+         - kubelet
+         - kubeadm
+         - kubectl
+        state: present
+        disable_excludes: 'kubernetes'
+
+    - name: Starting and Enabling kubelet
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+
+    - name: Setting kernel settings for iptables
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Initialising kubemaster
+      command: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.33.10
+
+    - name: Performing needed action to start using a cluster
+      file:
+        path: /home/vagrant/.kube
+        state: directory
+
+    - name: Copying a config file
+      command: cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
+
+    - name: Changing an owner for the config file
+      file:
+         path: /home/vagrant/.kube/config
+         owner: vagrant
+         group: vagrant
+
+    - name: Downloading a yaml for a flannel pod network
+      get_url:
+         url: https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml
+         dest: /home/vagrant/kube-flannel.yml
+
+    - name: Setting up a pod network
+      become: no
+      command: kubectl apply -f ~/kube-flannel.yml
+
+    - name: Creating a new token that valid for one hour, and generating a join command for nodes
+      become: no
+      shell: kubeadm token create $(kubeadm token generate) --print-join-command --ttl=1h > /vagrant/join_node.txt
