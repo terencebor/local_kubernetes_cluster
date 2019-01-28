@@ -1,5 +1,5 @@
-README
-This files can be used to create a kubernetes kubeadm cluster on your local machine.
+#README
+This files can be used to create a Kubernetes kubeadm cluster on your local machine.
 Cluster consists of one master and two worker nodes based on CentOS 7 (bento/centos-7).
 For creation these Ansible playbooks used information from: https://kubernetes.io/docs/setup/independent/install-kubeadm/
 
