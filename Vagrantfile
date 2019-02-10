@@ -12,6 +12,10 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
+  # Box used for nodes is bento/centos-7 because of /vagrant shared folder.
+  # Where master node shares a temporary key for worker nodes to connect.
+  # Other boxes might use rsync for this folder and stage where nodes connect
+  # to cluster won't work.
   config.vm.box = "bento/centos-7"
 
   # Disable automatic box update checking. If you disable this, then
@@ -52,8 +56,10 @@ Vagrant.configure("2") do |config|
   config.vm.provider "virtualbox" do |vb|
   #   # Display the VirtualBox GUI when booting the machine
   #   vb.gui = true
+  # It's recommended by Kubernetes documentation to have minimum 2 VCPU
+  # for each node.    
     vb.cpus = "2"
-  #   # Customize the amount of memory on the VM:
+  # And the amount of memory for the node minimum 2GB.
     vb.memory = "2048"
   end
 
@@ -67,7 +73,7 @@ Vagrant.configure("2") do |config|
   #   apt-get update
   #   apt-get install -y apache2
   # SHELL
-
+  # Master node.
   config.vm.define "master" do |cluster|
     cluster.vm.hostname = "kubemaster"
     cluster.vm.network "private_network", ip: "192.168.33.10"
@@ -75,6 +81,7 @@ Vagrant.configure("2") do |config|
       ansible.playbook = "kubemaster.yml"
     end
   end
+  # Here the worker nodes can be added (a new name and IP address must be set) 
   config.vm.define "node01" do |cluster|
     cluster.vm.hostname = "kubenode1"
     cluster.vm.network "private_network", ip: "192.168.33.20"
